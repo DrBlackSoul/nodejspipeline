@@ -1,28 +1,30 @@
 node {
   def gitcommit
-  stage('Verificación SCM') {
-    checkout scm
-    sh "git rev-parse --short HEAD > .git/commit-id"
-    gitcommit = readFile('.git/commit-id')
-  }
-  stage('test') {
-    def contenedortest = docker.image('node:4.6')
-    contenedortest.pull()
-    contenedortest.inside {
-      sh 'npm install --only=dev'
-      sh 'npm test'
+    stages {
+      stage('Verificación SCM') {
+      checkout scm
+      sh "git rev-parse --short HEAD > .git/commit-id"
+      gitcommit = readFile('.git/commit-id')
     }
-  }
-  stage('Docker Build & Push') {
-    docker.withRegistry('https://registry.hub.docker.com', 'docker-hub') {
-      def nuestraapp = docker.build("mfiordaliso/nodejsapp:${gitcommit}", ".")
-      nuestraapp.push()
+    stage('test') {
+      def contenedortest = docker.image('node:4.6')
+      contenedortest.pull()
+      contenedortest.inside {
+        sh 'npm install --only=dev'
+        sh 'npm test'
+      }
     }
-  }
-  stage('Analisis SonarQube') {
-    def sonarqubeScannerHome = tool name: 'sonar', type: 'sonar-scanner'
-    withCredentials([string(credentialsId: 'sonar', variable: 'sonarLogin')]) {
-      sh "${sonarqubeScannerHome}/bin/sonar-scanner -e -Dsonar.host.url=http://sonarqube:9000 -Dsonar.login=${sonarLogin} -Dsonar.projectName=nodeJS -Dsonar.projectVersion=${env.BUILD_NUMBER}"
+    stage('Docker Build & Push') {
+      docker.withRegistry('https://registry.hub.docker.com', 'docker-hub') {
+        def nuestraapp = docker.build("mfiordaliso/nodejsapp:${gitcommit}", ".")
+        nuestraapp.push()
+      }
+    }
+    stage('Analisis SonarQube') {
+      def sonarqubeScannerHome = tool name: 'sonar', type: 'sonar-scanner'
+      withCredentials([string(credentialsId: 'sonar', variable: 'sonarLogin')]) {
+        sh "${sonarqubeScannerHome}/bin/sonar-scanner -e -Dsonar.host.url=http://sonarqube:9000 -Dsonar.login=${sonarLogin} -Dsonar.projectName=nodeJS -Dsonar.projectVersion=${env.BUILD_NUMBER}"
+      }
     }
   }
 }
